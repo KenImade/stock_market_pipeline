@@ -1,48 +1,65 @@
-Overview
-========
+# Stock Market Data Pipeline
 
-Welcome to Astronomer! This project was generated after you ran 'astro dev init' using the Astronomer CLI. This readme describes the contents of the project, as well as how to run Apache Airflow on your local machine.
+This project implements an Apache Airflow DAG that automates the analysis of stock data. The pipeline is designed to fetch stock prices for a given symbol, process and format the data, and finally load it into a data warehouse for further analysis. It leverages various Airflow operators and integrations including Python tasks, Docker containers, and Slack notifications.
 
-Project Contents
-================
+---
 
-Your Astro project contains the following files and folders:
+## Overview
 
-- dags: This folder contains the Python files for your Airflow DAGs. By default, this directory includes one example DAG:
-    - `example_astronauts`: This DAG shows a simple ETL pipeline example that queries the list of astronauts currently in space from the Open Notify API and prints a statement for each astronaut. The DAG uses the TaskFlow API to define tasks in Python, and dynamic task mapping to dynamically print a statement for each astronaut. For more on how this DAG works, see our [Getting started tutorial](https://www.astronomer.io/docs/learn/get-started-with-airflow).
-- Dockerfile: This file contains a versioned Astro Runtime Docker image that provides a differentiated Airflow experience. If you want to execute other commands or overrides at runtime, specify them here.
-- include: This folder contains any additional files that you want to include as part of your project. It is empty by default.
-- packages.txt: Install OS-level packages needed for your project by adding them to this file. It is empty by default.
-- requirements.txt: Install Python packages needed for your project by adding them to this file. It is empty by default.
-- plugins: Add custom or community plugins for your project to this file. It is empty by default.
-- airflow_settings.yaml: Use this local-only file to specify Airflow Connections, Variables, and Pools instead of entering them in the Airflow UI as you develop DAGs in this project.
+The pipeline consists of the following main steps:
 
-Deploy Your Project Locally
-===========================
+1. **API Availability Check**  
+   A sensor task (`is_api_available`) checks whether the external stock API is available by making an HTTP request. It uses Airflow’s connection management to retrieve the API details.
 
-1. Start Airflow on your local machine by running 'astro dev start'.
+2. **Data Extraction**  
+   - **Get Stock Prices:** A Python task (`get_stock_prices`) calls the `_get_stock_prices` function to fetch the latest stock data for a specified symbol (e.g., AAPL).  
+   - **Store Prices:** The retrieved stock data is then passed to a second Python task (`store_prices`), which stores the raw data using the `_store_prices` function.
 
-This command will spin up 4 Docker containers on your machine, each for a different Airflow component:
+3. **Data Transformation**  
+   - **Format Prices:** A Docker task (`format_prices`) executes a containerized application (using the `airflow/stock-app` image) to process and format the stored data. This task is configured to run on a Spark master node.
+   - **Get Formatted CSV:** Once the data is formatted, another Python task (`get_formatted_csv`) retrieves the path to the formatted CSV file using the `_get_formatted_csv` function.
 
-- Postgres: Airflow's Metadata Database
-- Webserver: The Airflow component responsible for rendering the Airflow UI
-- Scheduler: The Airflow component responsible for monitoring and triggering tasks
-- Triggerer: The Airflow component responsible for triggering deferred tasks
+4. **Data Loading**  
+   The final step loads the formatted CSV file from an S3 bucket (via MinIO) into a PostgreSQL data warehouse. This is achieved using the Astro SDK’s `load_file` function, which handles the data ingestion and transformation into the target table (`stock_market`).
 
-2. Verify that all 4 Docker containers were created by running 'docker ps'.
+5. **Notifications**  
+   Slack notifications are integrated for both successful and failed DAG runs, alerting the configured channel about the status of the pipeline.
 
-Note: Running 'astro dev start' will start your project with the Airflow Webserver exposed at port 8080 and Postgres exposed at port 5432. If you already have either of those ports allocated, you can either [stop your existing Docker containers or change the port](https://www.astronomer.io/docs/astro/cli/troubleshoot-locally#ports-are-not-available-for-my-local-airflow-webserver).
+---
 
-3. Access the Airflow UI for your local Airflow project. To do so, go to http://localhost:8080/ and log in with 'admin' for both your Username and Password.
+## Prerequisites
 
-You should also be able to access your Postgres Database at 'localhost:5432/postgres'.
+Before running the pipeline, ensure you have the following:
 
-Deploy Your Project to Astronomer
-=================================
+- **Astro CLI:** Installed and configured to run Airflow.
+- **Apache Airflow:** Installed and configured to run DAGs.
+- **Python Environment:** Python 3.7+ with necessary packages installed (e.g., `astro`, `apache-airflow`, etc.).
+- **Docker:** Docker must be installed and properly configured, as the pipeline uses a DockerOperator to run the data formatting task.
+- **Airflow Connections:** The following connections must be set up in Airflow:
+  - `stock_api`: Contains the host, endpoint, headers, etc.
+  - `minio`: Credentials and endpoint for accessing the S3-compatible bucket.
+  - `postgres`: Connection details for the target PostgreSQL data warehouse.
+  - `slack`: Slack webhook/connection configuration for notifications.
 
-If you have an Astronomer account, pushing code to a Deployment on Astronomer is simple. For deploying instructions, refer to Astronomer documentation: https://www.astronomer.io/docs/astro/deploy-code/
+---
 
-Contact
-=======
+## Installation
 
-The Astronomer CLI is maintained with love by the Astronomer team. To report a bug or suggest a change, reach out to our support.
+1. **Clone the Repository:**
+
+   ```bash
+   git clone https://your-repo-url.git
+   cd your-repo-folder
+   ```
+
+2. **Ensure Docker is up and running**
+
+3. **Run the project with the Astro CLI command**
+
+    ```bash
+    astro dev start
+    ```
+
+3. **Setup Connections in Airflow** Navigate to the Airflow UI. Under **Admin > Connections** setup the relevant connections as mentioned in the Prerequisites.
+
+4. **Run the DAG**
