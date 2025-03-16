@@ -63,3 +63,9 @@ Before running the pipeline, ensure you have the following:
 3. **Setup Connections in Airflow** Navigate to the Airflow UI. Under **Admin > Connections** setup the relevant connections as mentioned in the Prerequisites.
 
 4. **Run the DAG**
+
+5. **The Project can be brought down with the Astro CLI command**
+
+    ```bash
+    astro dev stop
+    ```
