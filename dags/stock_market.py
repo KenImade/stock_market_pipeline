@@ -18,8 +18,8 @@ SYMBOL = 'AAPL'
 
 @dag(
     start_date=datetime(2025, 1, 1),
-    schedule='@daily',
-    catchup=False,
+    schedule='0 6 * * 1-5',
+    catchup=True,
     tags=['stock_market'],
     on_success_callback=SlackNotifier(
         slack_conn_id='slack',
